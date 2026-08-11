@@ -12,6 +12,10 @@ latency and API usage compared with `medium` or `low`.
 It is an agent framework, not a claim of human intelligence or guaranteed
 accuracy. Important output and actions should still be reviewed.
 
+## iOS preview
+
+![Potter 8.0 running in an iPhone Simulator](docs/Potter-8.0-iOS-preview.png)
+
 ## What is included
 
 - Interactive terminal chat and one-shot `ask` mode.
