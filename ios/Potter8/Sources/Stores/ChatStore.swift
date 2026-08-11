@@ -4,6 +4,8 @@ import Observation
 @MainActor
 @Observable
 final class ChatStore {
+    static let maximumPendingImages = 4
+
     private enum Keys {
         static let messages = "potter.messages"
         static let sessionID = "potter.sessionID"
@@ -11,6 +13,8 @@ final class ChatStore {
 
     var messages: [ChatMessage]
     var draft = ""
+    var pendingImages: [PendingImageAttachment] = []
+    var isLoadingImages = false
     var isSending = false
     var errorMessage: String?
 
@@ -40,25 +44,48 @@ final class ChatStore {
 
     func send(using settings: PotterSettings) async {
         let message = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !message.isEmpty, !isSending else { return }
+        let images = pendingImages
+        guard (!message.isEmpty || !images.isEmpty), !isSending, !isLoadingImages else { return }
         guard let baseURL = settings.baseURL else {
             errorMessage = PotterClientError.invalidServerURL.localizedDescription
             return
         }
 
+        let messageForAgent: String
+        if message.isEmpty {
+            messageForAgent = images.count == 1
+                ? "What can you tell me about this image?"
+                : "What can you tell me about these images?"
+        } else {
+            messageForAgent = message
+        }
+
         draft = ""
+        pendingImages = []
         errorMessage = nil
         isSending = true
         defer { isSending = false }
-        messages.append(ChatMessage(role: .user, text: message))
+        messages.append(
+            ChatMessage(
+                role: .user,
+                text: messageForAgent,
+                images: images.map { ChatImageAttachment(thumbnailData: $0.thumbnailData) }
+            )
+        )
         persistMessages()
 
         do {
             let response = try await client.send(
                 baseURL,
                 settings.accessToken,
-                message,
-                sessionID
+                messageForAgent,
+                sessionID,
+                images.map {
+                    PotterImageInput(
+                        mimeType: $0.mimeType,
+                        data: $0.imageData.base64EncodedString()
+                    )
+                }
             )
             messages.append(ChatMessage(role: .potter, text: response.reply))
             persistMessages()
@@ -69,12 +96,23 @@ final class ChatStore {
         }
     }
 
+    func addPendingImage(_ image: PendingImageAttachment) {
+        guard pendingImages.count < Self.maximumPendingImages else { return }
+        pendingImages.append(image)
+    }
+
+    func removePendingImage(id: UUID) {
+        pendingImages.removeAll { $0.id == id }
+    }
+
     func startNewConversation(using settings: PotterSettings) async {
         let oldSessionID = sessionID
         sessionID = "ios-\(UUID().uuidString.lowercased())"
         defaults?.set(sessionID, forKey: Keys.sessionID)
         messages = []
         draft = ""
+        pendingImages = []
+        isLoadingImages = false
         errorMessage = nil
         persistMessages()
 

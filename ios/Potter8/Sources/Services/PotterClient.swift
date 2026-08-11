@@ -22,7 +22,8 @@ struct PotterClient: Sendable {
         _ baseURL: URL,
         _ token: String,
         _ message: String,
-        _ sessionID: String
+        _ sessionID: String,
+        _ images: [PotterImageInput]
     ) async throws -> PotterChatResponse
     var reset: @Sendable (
         _ baseURL: URL,
@@ -34,7 +35,7 @@ struct PotterClient: Sendable {
 
 extension PotterClient {
     static let live = PotterClient(
-        send: { baseURL, token, message, sessionID in
+        send: { baseURL, token, message, sessionID, images in
             var request = try request(
                 baseURL: baseURL,
                 path: "v1/chat",
@@ -42,7 +43,7 @@ extension PotterClient {
                 token: token
             )
             request.httpBody = try JSONEncoder().encode(
-                PotterChatRequest(message: message, sessionID: sessionID)
+                PotterChatRequest(message: message, sessionID: sessionID, images: images)
             )
             return try await perform(request, as: PotterChatResponse.self)
         },
@@ -70,10 +71,11 @@ extension PotterClient {
     )
 
     static let preview = PotterClient(
-        send: { _, _, message, sessionID in
+        send: { _, _, message, sessionID, images in
             try await Task.sleep(for: .milliseconds(250))
+            let imageNote = images.isEmpty ? "" : " with \(images.count) attached image\(images.count == 1 ? "" : "s")"
             return PotterChatResponse(
-                reply: "I can help with ‘\(message)’. This is the offline preview response.",
+                reply: "I can help with ‘\(message)’\(imageNote). This is the offline preview response.",
                 sessionID: sessionID,
                 model: "preview"
             )

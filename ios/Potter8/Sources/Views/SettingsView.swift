@@ -55,6 +55,7 @@ struct SettingsView: View {
             Section("Privacy and safety") {
                 Label("The OpenAI API key stays on your Python server.", systemImage: "key.horizontal")
                 Label("The iOS app stores only the local access token in Keychain.", systemImage: "lock.shield")
+                Label("Photos are sent only after you attach and send them.", systemImage: "photo.on.rectangle")
                 Label("Shell commands and file writes are disabled in iOS server mode.", systemImage: "hand.raised")
             }
 

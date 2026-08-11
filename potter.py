@@ -11,6 +11,8 @@ from __future__ import annotations
 import argparse
 import ast
 import asyncio
+import base64
+import binascii
 import hmac
 import json
 import math
@@ -39,7 +41,15 @@ DEFAULT_MODEL = "gpt-5.6"
 DEFAULT_REASONING = "high"
 MAX_FILE_CHARS = 200_000
 MAX_TOOL_OUTPUT_CHARS = 20_000
-MAX_HTTP_BODY_BYTES = 64 * 1024
+MAX_HTTP_BODY_BYTES = 24 * 1024 * 1024
+MAX_IMAGE_COUNT = 4
+MAX_IMAGE_BYTES = 4 * 1024 * 1024
+ALLOWED_IMAGE_MIME_TYPES = {
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+}
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 
@@ -52,6 +62,16 @@ class RuntimePolicy:
 
 
 RUNTIME_POLICY = RuntimePolicy(workspace=Path.cwd().resolve())
+
+
+@dataclass(frozen=True)
+class ImageInput:
+    mime_type: str
+    data: str
+
+    @property
+    def data_url(self) -> str:
+        return f"data:{self.mime_type};base64,{self.data}"
 
 
 def configure_runtime_policy(
@@ -76,6 +96,78 @@ def normalize_session_id(value: str) -> str:
             "session_id must be 1-64 characters using letters, numbers, '.', '-', or '_'"
         )
     return value
+
+
+def _matches_image_mime_type(data: bytes, mime_type: str) -> bool:
+    if mime_type == "image/jpeg":
+        return data.startswith(b"\xff\xd8\xff")
+    if mime_type == "image/png":
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
+    if mime_type == "image/gif":
+        return data.startswith((b"GIF87a", b"GIF89a"))
+    if mime_type == "image/webp":
+        return len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return False
+
+
+def parse_image_inputs(value: Any) -> list[ImageInput]:
+    """Validate local API image inputs before forwarding them to OpenAI."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("images must be an array")
+    if len(value) > MAX_IMAGE_COUNT:
+        raise ValueError(f"images can contain at most {MAX_IMAGE_COUNT} items")
+
+    parsed: list[ImageInput] = []
+    max_encoded_length = ((MAX_IMAGE_BYTES + 2) // 3) * 4 + 4
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f"images[{index}] must be an object")
+        mime_type = item.get("mime_type")
+        encoded = item.get("data")
+        if not isinstance(mime_type, str) or mime_type not in ALLOWED_IMAGE_MIME_TYPES:
+            raise ValueError(f"images[{index}] has an unsupported mime_type")
+        if not isinstance(encoded, str) or not encoded or len(encoded) > max_encoded_length:
+            raise ValueError(f"images[{index}] data is missing or too large")
+        try:
+            decoded = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError) as error:
+            raise ValueError(f"images[{index}] data must be valid Base64") from error
+        if not decoded or len(decoded) > MAX_IMAGE_BYTES:
+            raise ValueError(f"images[{index}] exceeds the {MAX_IMAGE_BYTES // (1024 * 1024)} MiB limit")
+        if not _matches_image_mime_type(decoded, mime_type):
+            raise ValueError(f"images[{index}] data does not match its mime_type")
+        parsed.append(
+            ImageInput(
+                mime_type=mime_type,
+                data=base64.b64encode(decoded).decode("ascii"),
+            )
+        )
+    return parsed
+
+
+def build_agent_input(message: str, images: list[ImageInput]) -> list[dict[str, Any]]:
+    """Build one Responses-style multimodal user turn for the Agents SDK."""
+    text = message.strip()
+    if not text and not images:
+        raise ValueError("message or images are required")
+    if not text:
+        text = (
+            "What can you tell me about this image?"
+            if len(images) == 1
+            else "What can you tell me about these images?"
+        )
+    content: list[dict[str, str]] = [{"type": "input_text", "text": text}]
+    content.extend(
+        {
+            "type": "input_image",
+            "image_url": image.data_url,
+            "detail": "auto",
+        }
+        for image in images
+    )
+    return [{"role": "user", "content": content}]
 
 
 def resolve_workspace_path(value: str) -> Path:
@@ -420,9 +512,15 @@ class PotterEngine:
         self.session_store = session_store
         self.agent = build_agent(model, reasoning_effort)
 
-    async def reply(self, message: str, session_id: str) -> str:
-        if not message.strip():
-            raise ValueError("message cannot be empty")
+    async def reply(
+        self,
+        message: str,
+        session_id: str,
+        images: list[ImageInput] | None = None,
+    ) -> str:
+        images = images or []
+        if not message.strip() and not images:
+            raise ValueError("message or images are required")
         if len(message) > 50_000:
             raise ValueError("message is too long")
         session_id = normalize_session_id(session_id)
@@ -435,7 +533,10 @@ class PotterEngine:
         options: dict[str, Any] = {}
         if previous_response_id:
             options["previous_response_id"] = previous_response_id
-        result = await Runner.run(self.agent, message, **options)
+        run_input: str | list[dict[str, Any]] = (
+            build_agent_input(message, images) if images else message
+        )
+        result = await Runner.run(self.agent, run_input, **options)
         response_id = getattr(result, "last_response_id", None)
         if response_id:
             self.session_store.set(session_id, str(response_id))
@@ -483,7 +584,7 @@ def _make_http_handler(
             except ValueError as error:
                 raise ValueError("Invalid Content-Length") from error
             if length <= 0 or length > MAX_HTTP_BODY_BYTES:
-                raise ValueError("Request body must be between 1 byte and 64 KiB")
+                raise ValueError("Request body must be between 1 byte and 24 MiB")
             raw = self.rfile.read(length)
             parsed = json.loads(raw.decode("utf-8"))
             if not isinstance(parsed, dict):
@@ -516,7 +617,8 @@ def _make_http_handler(
                     message = payload.get("message")
                     if not isinstance(message, str):
                         raise ValueError("message must be a string")
-                    reply = async_run(engine.reply(message, session_id))
+                    images = parse_image_inputs(payload.get("images"))
+                    reply = async_run(engine.reply(message, session_id, images))
                     self._send_json(
                         HTTPStatus.OK,
                         {"reply": reply, "session_id": session_id, "model": engine.model},

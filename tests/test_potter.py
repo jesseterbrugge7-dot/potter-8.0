@@ -1,3 +1,4 @@
+import base64
 import tempfile
 import unittest
 from pathlib import Path
@@ -51,6 +52,35 @@ class PotterCoreTests(unittest.TestCase):
         self.assertEqual(potter.normalize_session_id("ios-123"), "ios-123")
         with self.assertRaises(ValueError):
             potter.normalize_session_id("../../bad")
+
+    def test_image_input_builds_multimodal_turn(self) -> None:
+        jpeg = b"\xff\xd8\xff\xe0potter-test"
+        images = potter.parse_image_inputs(
+            [
+                {
+                    "mime_type": "image/jpeg",
+                    "data": base64.b64encode(jpeg).decode("ascii"),
+                }
+            ]
+        )
+        turn = potter.build_agent_input("Describe this", images)
+        self.assertEqual(turn[0]["role"], "user")
+        self.assertEqual(turn[0]["content"][0]["type"], "input_text")
+        self.assertEqual(turn[0]["content"][1]["type"], "input_image")
+        self.assertTrue(turn[0]["content"][1]["image_url"].startswith("data:image/jpeg;base64,"))
+
+    def test_image_input_rejects_invalid_base64(self) -> None:
+        with self.assertRaisesRegex(ValueError, "valid Base64"):
+            potter.parse_image_inputs(
+                [{"mime_type": "image/jpeg", "data": "not-base64"}]
+            )
+
+    def test_image_input_rejects_mime_mismatch(self) -> None:
+        encoded = base64.b64encode(b"not-a-png").decode("ascii")
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            potter.parse_image_inputs(
+                [{"mime_type": "image/png", "data": encoded}]
+            )
 
 
 if __name__ == "__main__":

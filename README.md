@@ -24,6 +24,7 @@ accuracy. Important output and actions should still be reviewed.
 - Optional file writes and subprocesses in CLI mode only.
 - Per-action approval for every write or command.
 - Local authenticated HTTP bridge for the included SwiftUI app.
+- Up to four photo attachments per iOS message, with real multimodal analysis.
 - Local conversation continuation, iOS chat history, tests, and MIT license.
 
 ## Fastest terminal setup
@@ -141,6 +142,11 @@ In Xcode:
 4. Open Settings in the app and enter the server URL and printed access token.
 5. Tap **Test connection**.
 
+In chat, tap the photo button beside the message field to attach up to four
+images. Potter creates lightweight previews on-device, sends the resized images
+through your authenticated local server, and passes them to the model as vision
+inputs. Selected photos are not sent until you tap the send button.
+
 For Simulator use `http://127.0.0.1:8787`. For a physical iPhone, use the
 printed `.local` address and allow Local Network access. The app enables only
 local-network HTTP while leaving App Transport Security enabled elsewhere, in
@@ -171,6 +177,10 @@ curl http://127.0.0.1:8787/v1/chat \
   -d '{"session_id":"demo","message":"What can you do?"}'
 ```
 
+The optional `images` field accepts up to four Base64-encoded JPEG, PNG, WEBP,
+or non-animated GIF inputs. Each decoded image is limited to 4 MiB. The iOS app
+automatically resizes and converts selected photos before sending them.
+
 Endpoints:
 
 | Method | Path | Purpose |
@@ -190,6 +200,7 @@ Endpoints:
 - Commands use an argument list with `shell=False` and receive an environment
   stripped of variables with key/token/secret/password-like names.
 - HTTP/iOS mode cannot execute commands or write files.
+- HTTP image inputs are count-, size-, Base64-, signature-, and MIME-validated.
 - The iOS app stores the local bridge token in Keychain.
 
 Read [SECURITY.md](SECURITY.md) before extending Potter with consequential tools.
