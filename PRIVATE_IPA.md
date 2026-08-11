@@ -21,9 +21,11 @@ computer or iPhone.
 2. Open the repository's **Actions** tab.
 3. Choose **Build unsigned Potter IPA**.
 4. Select **Run workflow**.
-5. When the run is green, open it and download the
-   `Potter-8.0-unsigned-IPA` artifact.
-6. Unzip that artifact. It contains `Potter-8.0-unsigned.ipa`.
+5. When the run is green, open the repository's **Releases** page and open the
+   draft named **Potter 8.0 private IPA**. Draft releases are visible only to
+   repository collaborators with write access.
+6. Download `Potter-8.0-unsigned.ipa`. The run also keeps a zipped Actions
+   artifact as a backup.
 
 The workflow compiles with Xcode on GitHub's macOS runner. The resulting IPA is
 not installable until stage 2 signs it for your iPhone.
@@ -64,4 +66,3 @@ Keep that PowerShell window open. Connect the iPhone and PC to the same trusted
 Wi-Fi network, then enter the server URL and access token shown in PowerShell
 into Potter's iPhone settings. Windows may ask whether Python can communicate
 through the firewall; allow it for private networks only.
-
