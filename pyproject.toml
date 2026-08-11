@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "potter-agent"
+version = "8.0.0"
+description = "An open-source, terminal-first AI agent with a safe local iOS bridge."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Potter 8.0 contributors" }]
+dependencies = ["openai-agents"]
+keywords = ["openai", "agent", "cli", "ios", "swiftui"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+
+[project.scripts]
+potter = "potter:main"
+
+[tool.setuptools]
+py-modules = ["potter"]

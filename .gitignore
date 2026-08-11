@@ -1,0 +1,10 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.potter8/
+dist/
+ios/Potter8/Potter8.xcodeproj/
+ios/Potter8/DerivedData/

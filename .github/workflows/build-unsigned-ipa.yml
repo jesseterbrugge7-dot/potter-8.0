@@ -1,0 +1,31 @@
+name: Build unsigned Potter IPA
+
+"on":
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build on macOS
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out Potter
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build unsigned IPA
+        run: bash scripts/build-unsigned-ipa.sh
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Potter-8.0-unsigned-IPA
+          path: dist/Potter-8.0-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
