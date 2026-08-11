@@ -1,7 +1,9 @@
 import base64
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import potter
 
@@ -81,6 +83,59 @@ class PotterCoreTests(unittest.TestCase):
             potter.parse_image_inputs(
                 [{"mime_type": "image/png", "data": encoded}]
             )
+
+    def test_model_aliases_resolve_to_stable_ids(self) -> None:
+        self.assertEqual(
+            potter.resolve_model_definition("gpt-5.6").id,
+            "openai-gpt-5.6",
+        )
+        self.assertEqual(
+            potter.resolve_model_definition("gemini-3.1-pro-preview").id,
+            "google-gemini-3.1-pro",
+        )
+        self.assertEqual(
+            potter.resolve_model_definition("claude-code").id,
+            "anthropic-claude-code",
+        )
+
+    def test_unknown_model_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unknown model"):
+            potter.resolve_model_definition("free-stolen-premium-model")
+
+    def test_provider_key_requirement_is_clear(self) -> None:
+        definition = potter.resolve_model_definition("openai-gpt-5.6")
+        with mock.patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(potter.ProviderError, "OPENAI_API_KEY"):
+                potter._require_provider_key(definition)
+            self.assertIsNone(
+                potter._require_provider_key(
+                    potter.resolve_model_definition("ollama-local-free")
+                )
+            )
+
+    def test_compatible_payload_contains_selected_model_and_image(self) -> None:
+        definition = potter.resolve_model_definition("moonshot-kimi-k3")
+        image = potter.ImageInput(
+            mime_type="image/jpeg",
+            data=base64.b64encode(b"\xff\xd8\xffpotter").decode("ascii"),
+        )
+        payload = potter._openai_compatible_payload(
+            definition,
+            [{"role": "assistant", "content": "Earlier reply"}],
+            "What is this?",
+            [image],
+        )
+        self.assertEqual(payload["model"], "kimi-k3")
+        self.assertEqual(payload["messages"][-1]["content"][1]["type"], "image_url")
+
+    def test_conversation_store_keeps_provider_history_separate(self) -> None:
+        path = self.root / "conversations.json"
+        store = potter.ConversationStore(path)
+        first = potter.model_session_key("ios-test", "anthropic-fable-5")
+        second = potter.model_session_key("ios-test", "xai-grok-4.5")
+        store.append_turn(first, "Hello", "Hi")
+        self.assertEqual(len(potter.ConversationStore(path).get(first)), 2)
+        self.assertEqual(potter.ConversationStore(path).get(second), [])
 
 
 if __name__ == "__main__":

@@ -12,6 +12,40 @@ struct SettingsView: View {
 
         Form {
             Section {
+                Picker("AI model", selection: $settings.selectedModel) {
+                    ForEach(PotterModelOption.allCases) { model in
+                        Label(model.title, systemImage: model.systemImage)
+                            .tag(model)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                LabeledContent("Provider", value: settings.selectedModel.provider)
+                LabeledContent("Access", value: settings.selectedModel.access)
+
+                if let variable = settings.selectedModel.serverVariable {
+                    LabeledContent("Server key") {
+                        Text(variable)
+                            .font(.caption.monospaced())
+                    }
+                } else {
+                    LabeledContent("Server key", value: "Not required")
+                }
+            } header: {
+                Text("AI model")
+            } footer: {
+                if settings.selectedModel == .localFree {
+                    Text("Free local mode uses Ollama on your Potter computer. Run: ollama pull gemma3:4b")
+                } else if settings.selectedModel == .gemini31Pro {
+                    Text("Gemini offers a limited free API tier. Put GEMINI_API_KEY in the Potter server terminal, never in the app or GitHub.")
+                } else if settings.selectedModel == .claudeCode {
+                    Text("Claude Code mode is a coding-focused Fable 5 chat. It is not Anthropic's separate Claude Code terminal or cloud-routines product.")
+                } else {
+                    Text("This provider charges for API usage. Add its key only to the Potter server terminal; the key never enters the iOS app.")
+                }
+            }
+
+            Section {
                 TextField("Server URL", text: $settings.serverURLText)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
@@ -53,7 +87,7 @@ struct SettingsView: View {
             }
 
             Section("Privacy and safety") {
-                Label("The OpenAI API key stays on your Python server.", systemImage: "key.horizontal")
+                Label("Provider API keys stay on your Python server.", systemImage: "key.horizontal")
                 Label("The iOS app stores only the local access token in Keychain.", systemImage: "lock.shield")
                 Label("Photos are sent only after you attach and send them.", systemImage: "photo.on.rectangle")
                 Label("Shell commands and file writes are disabled in iOS server mode.", systemImage: "hand.raised")
@@ -61,7 +95,7 @@ struct SettingsView: View {
 
             Section("About") {
                 LabeledContent("Name", value: "Potter 8.0")
-                LabeledContent("Version", value: "8.0.0")
+                LabeledContent("Version", value: "8.0.1")
                 LabeledContent("License", value: "MIT")
             }
         }

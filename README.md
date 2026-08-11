@@ -1,10 +1,14 @@
 # Potter 8.0
 
 Potter 8.0 is an open-source AI agent that runs in a Python terminal and can
-also power a native SwiftUI iPhone/iPad chat app. It uses the OpenAI Agents SDK,
-defaults to `gpt-5.6`, keeps multi-turn conversation state, searches the web,
-calculates, reads workspace files, and routes research, analysis, and coding
-work to focused specialists.
+also power a native SwiftUI iPhone/iPad chat app. Its model picker supports
+OpenAI GPT-5.6, Claude Fable 5, Kimi K3, Grok 4.5, Gemini 3.1 Pro, a
+Fable-powered Claude Code mode, and a genuinely free local Ollama model.
+
+OpenAI mode uses the OpenAI Agents SDK, keeps response continuation state,
+searches the web, calculates, reads workspace files, and routes research,
+analysis, and coding work to focused specialists. Other provider modes keep
+separate local text histories and use their chat/vision APIs.
 
 The default reasoning effort is `high` for quality-first work. This increases
 latency and API usage compared with `medium` or `low`.
@@ -24,12 +28,16 @@ accuracy. Important output and actions should still be reviewed.
 - Optional file writes and subprocesses in CLI mode only.
 - Per-action approval for every write or command.
 - Local authenticated HTTP bridge for the included SwiftUI app.
+- In-app AI model picker with separate conversation state for every model.
+- Server-only provider keys; no provider credential is stored in the IPA.
+- Free local vision chat through Ollama and `gemma3:4b`.
 - Up to four photo attachments per iOS message, with real multimodal analysis.
 - Local conversation continuation, iOS chat history, tests, and MIT license.
 
 ## Fastest terminal setup
 
-Requirements: Python 3.11+ and an OpenAI Platform API key.
+Requirements: Python 3.11+. OpenAI mode additionally needs an OpenAI Platform
+API key; free local mode needs [Ollama](https://ollama.com/download).
 
 ```bash
 cd potter-8.0
@@ -41,8 +49,8 @@ potter chat
 ```
 
 The official setup uses the `OPENAI_API_KEY` environment variable; do not paste
-the key into `potter.py` or commit it. OpenAI API usage is billed through the
-Platform account and is separate from a ChatGPT subscription. See the official
+the key into `potter.py`, the iOS app, chat, or GitHub. OpenAI API usage is
+billed through the Platform account and is separate from a ChatGPT subscription. See the official
 [SDK setup](https://developers.openai.com/api/docs/libraries) and
 [production security guidance](https://developers.openai.com/api/docs/guides/production-best-practices).
 
@@ -89,7 +97,16 @@ potter --workspace /absolute/path/to/project chat --allow-shell
 potter reset --session cli
 ```
 
-Inside interactive chat, use `/new`, `/reset`, `/help`, or `/exit`.
+Inside interactive chat, use `/models`, `/model`, `/new`, `/reset`, `/help`,
+or `/exit`.
+
+Use `/models` to list every AI choice and `/model <id>` to switch without
+restarting Potter. For example:
+
+```text
+/model google-gemini-3.1-pro
+/model ollama-local-free
+```
 
 The OpenAI Agents SDK runs the repeated tool loop and continuation flow. Potter
 uses the documented `previous_response_id` strategy rather than replaying and
@@ -97,10 +114,54 @@ duplicating local history. See the official
 [Agents SDK overview](https://developers.openai.com/api/docs/guides/agents) and
 [running-agents guide](https://developers.openai.com/api/docs/guides/agents/running-agents).
 
+## AI choices and cost
+
+| Picker choice | Potter ID | Server setup | Access |
+| --- | --- | --- | --- |
+| OpenAI GPT-5.6 | `openai-gpt-5.6` | `OPENAI_API_KEY` | Paid API |
+| Claude Fable 5 | `anthropic-fable-5` | `ANTHROPIC_API_KEY` | Paid API |
+| Kimi K3 | `moonshot-kimi-k3` | `MOONSHOT_API_KEY` | Paid hosted API; open-weight model |
+| Grok 4.5 | `xai-grok-4.5` | `XAI_API_KEY` | Paid API |
+| Gemini 3.1 Pro | `google-gemini-3.1-pro` | `GEMINI_API_KEY` | Limited free API tier available |
+| Claude Code | `anthropic-claude-code` | `ANTHROPIC_API_KEY` | Paid Fable 5 coding mode |
+| Potter Local | `ollama-local-free` | Ollama + `gemma3:4b` | Free on your computer |
+
+Claude Code in the Potter picker is an accurately labeled coding-focused chat
+mode powered by Fable 5. It is not Anthropic's separate Claude Code CLI or cloud
+routines product and cannot edit your computer through the iOS server.
+
+No software can legally make the paid proprietary APIs unlimited and free.
+Potter does not bypass billing, share keys, or include hidden credentials.
+
+### Free local setup
+
+Install Ollama, then paste these commands into Terminal:
+
+```bash
+ollama pull gemma3:4b
+potter serve --host 0.0.0.0
+```
+
+Select **Potter Local** in the iOS app. No AI API key is required. You can use a
+different installed Ollama model with `POTTER_OLLAMA_MODEL`, and a remote Ollama
+computer with `OLLAMA_BASE_URL`.
+
+### Gemini free-tier setup
+
+Create your own Gemini API key, then keep it only in the server terminal:
+
+```bash
+export GEMINI_API_KEY="paste_your_private_key_here"
+potter serve --host 0.0.0.0
+```
+
+Select **Gemini 3.1 Pro** in Potter. Google's free-tier limits and availability
+still apply.
+
 ## Run the iOS backend
 
-The iOS app never contains the OpenAI API key. Start Potter on the Mac or other
-computer that owns the key:
+The iOS app never contains provider API keys. Start Potter on the Mac or other
+computer that owns any keys you want to use:
 
 ```bash
 source .venv/bin/activate
@@ -113,7 +174,7 @@ The server prints two values needed by the app:
 - A URL such as `http://Your-Mac.local:8787`.
 - A random local access token.
 
-The access token protects the local bridge; it is not an OpenAI API key. The
+The access token protects the local bridge; it is not a provider API key. The
 server disables shell and file-write tools in iOS/HTTP mode. Use this only on a
 trusted local network and stop it with Ctrl-C when finished.
 
@@ -140,7 +201,8 @@ In Xcode:
 2. Change the bundle identifier if `com.potter8.app` is unavailable.
 3. Run on an iPhone or Simulator.
 4. Open Settings in the app and enter the server URL and printed access token.
-5. Tap **Test connection**.
+5. Tap **Test connection**, then choose an AI model in Settings or by tapping
+   the model name under **Potter 8.0** in chat.
 
 In chat, tap the photo button beside the message field to attach up to four
 images. Potter creates lightweight previews on-device, sends the resized images
@@ -185,7 +247,8 @@ Endpoints:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/health` | Server, version, and model status |
+| `GET` | `/health` | Server, version, and default-model status |
+| `GET` | `/v1/models` | Authenticated model catalog and configuration status |
 | `POST` | `/v1/chat` | Send one message in a named session |
 | `POST` | `/v1/reset` | Forget one named session |
 
@@ -209,12 +272,18 @@ Read [SECURITY.md](SECURITY.md) before extending Potter with consequential tools
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | required | OpenAI Platform API key for Python only |
-| `POTTER_MODEL` | `gpt-5.6` | Model used by Potter and specialists |
+| `OPENAI_API_KEY` | optional | OpenAI GPT-5.6 key for Python only |
+| `ANTHROPIC_API_KEY` | optional | Fable 5 and Claude Code-mode key |
+| `MOONSHOT_API_KEY` | optional | Kimi K3 key |
+| `XAI_API_KEY` | optional | Grok 4.5 key |
+| `GEMINI_API_KEY` | optional | Gemini 3.1 Pro key; free tier may apply |
+| `POTTER_MODEL` | `openai-gpt-5.6` | Default Potter model ID |
 | `POTTER_REASONING` | `high` | Reasoning effort: `none` through `max` |
 | `POTTER_WORKSPACE` | current directory | Root available to file tools |
 | `POTTER_DATA_DIR` | `~/.potter8` | Local continuation-ID storage |
 | `POTTER_SERVER_TOKEN` | random per run | Local HTTP bearer token |
+| `POTTER_OLLAMA_MODEL` | `gemma3:4b` | Installed local Ollama model |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama server base URL |
 
 Use a lower-cost model by setting `POTTER_MODEL` before launch, provided that
 model supports the tools you enable.

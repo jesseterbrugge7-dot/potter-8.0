@@ -39,6 +39,7 @@ struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
     let role: MessageRole
     let text: String
     let images: [ChatImageAttachment]
+    let modelID: String?
     let createdAt: Date
 
     init(
@@ -46,12 +47,14 @@ struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
         role: MessageRole,
         text: String,
         images: [ChatImageAttachment] = [],
+        modelID: String? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
         self.role = role
         self.text = text
         self.images = images
+        self.modelID = modelID
         self.createdAt = createdAt
     }
 
@@ -60,6 +63,7 @@ struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
         case role
         case text
         case images
+        case modelID
         case createdAt
     }
 
@@ -69,6 +73,7 @@ struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
         role = try container.decode(MessageRole.self, forKey: .role)
         text = try container.decode(String.self, forKey: .text)
         images = try container.decodeIfPresent([ChatImageAttachment].self, forKey: .images) ?? []
+        modelID = try container.decodeIfPresent(String.self, forKey: .modelID)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 }
@@ -87,11 +92,13 @@ struct PotterChatRequest: Encodable, Sendable {
     let message: String
     let sessionID: String
     let images: [PotterImageInput]
+    let model: String
 
     enum CodingKeys: String, CodingKey {
         case message
         case sessionID = "session_id"
         case images
+        case model
     }
 }
 

@@ -80,6 +80,7 @@ final class ChatStore {
                 settings.accessToken,
                 messageForAgent,
                 sessionID,
+                settings.selectedModel.rawValue,
                 images.map {
                     PotterImageInput(
                         mimeType: $0.mimeType,
@@ -87,7 +88,13 @@ final class ChatStore {
                     )
                 }
             )
-            messages.append(ChatMessage(role: .potter, text: response.reply))
+            messages.append(
+                ChatMessage(
+                    role: .potter,
+                    text: response.reply,
+                    modelID: response.model
+                )
+            )
             persistMessages()
         } catch is CancellationError {
             return

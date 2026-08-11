@@ -23,6 +23,7 @@ struct PotterClient: Sendable {
         _ token: String,
         _ message: String,
         _ sessionID: String,
+        _ model: String,
         _ images: [PotterImageInput]
     ) async throws -> PotterChatResponse
     var reset: @Sendable (
@@ -35,7 +36,7 @@ struct PotterClient: Sendable {
 
 extension PotterClient {
     static let live = PotterClient(
-        send: { baseURL, token, message, sessionID, images in
+        send: { baseURL, token, message, sessionID, model, images in
             var request = try request(
                 baseURL: baseURL,
                 path: "v1/chat",
@@ -43,7 +44,12 @@ extension PotterClient {
                 token: token
             )
             request.httpBody = try JSONEncoder().encode(
-                PotterChatRequest(message: message, sessionID: sessionID, images: images)
+                PotterChatRequest(
+                    message: message,
+                    sessionID: sessionID,
+                    images: images,
+                    model: model
+                )
             )
             return try await perform(request, as: PotterChatResponse.self)
         },
@@ -71,18 +77,18 @@ extension PotterClient {
     )
 
     static let preview = PotterClient(
-        send: { _, _, message, sessionID, images in
+        send: { _, _, message, sessionID, model, images in
             try await Task.sleep(for: .milliseconds(250))
             let imageNote = images.isEmpty ? "" : " with \(images.count) attached image\(images.count == 1 ? "" : "s")"
             return PotterChatResponse(
                 reply: "I can help with ‘\(message)’\(imageNote). This is the offline preview response.",
                 sessionID: sessionID,
-                model: "preview"
+                model: model
             )
         },
         reset: { _, _, _ in },
         health: { _ in
-            PotterHealthResponse(status: "ok", name: "Potter 8.0", version: "8.0.0", model: "preview")
+            PotterHealthResponse(status: "ok", name: "Potter 8.0", version: "8.0.1", model: "preview")
         }
     )
 

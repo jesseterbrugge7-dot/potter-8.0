@@ -8,6 +8,7 @@ struct ChatView: View {
 
     var body: some View {
         @Bindable var store = store
+        @Bindable var settings = settings
 
         ScrollViewReader { proxy in
             ScrollView {
@@ -74,6 +75,34 @@ struct ChatView: View {
         .navigationTitle("Potter 8.0")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 1) {
+                    Text("Potter 8.0")
+                        .font(.headline)
+                    Text(settings.selectedModel.compactTitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Potter model")
+                .accessibilityValue(settings.selectedModel.title)
+            }
+
+            ToolbarTitleMenu {
+                ForEach(PotterModelOption.allCases) { model in
+                    Button {
+                        settings.selectedModel = model
+                    } label: {
+                        Label(
+                            model.title,
+                            systemImage: model == settings.selectedModel
+                                ? "checkmark"
+                                : model.systemImage
+                        )
+                    }
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Task { await store.startNewConversation(using: settings) }
@@ -153,6 +182,15 @@ private struct MessageBubble: View {
                         .textSelection(.enabled)
                         .padding(.horizontal, message.images.isEmpty ? 0 : 8)
                         .padding(.vertical, message.images.isEmpty ? 0 : 5)
+                }
+
+                if message.role == .potter,
+                   let modelID = message.modelID,
+                   let model = PotterModelOption(rawValue: modelID) {
+                    Label(model.compactTitle, systemImage: model.systemImage)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, message.images.isEmpty ? 0 : 8)
                 }
             }
                 .padding(.horizontal, message.images.isEmpty ? 14 : 6)

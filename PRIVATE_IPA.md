@@ -49,8 +49,8 @@ seven-day period. See Apple's
 
 ## Run the Potter server on the Windows PC
 
-The IPA is the iPhone interface. Potter's Python agent and OpenAI API key remain
-on your computer.
+The IPA is the iPhone interface. Potter's Python agent and any provider API
+keys remain on your computer.
 
 In PowerShell from the project folder:
 
@@ -66,3 +66,8 @@ Keep that PowerShell window open. Connect the iPhone and PC to the same trusted
 Wi-Fi network, then enter the server URL and access token shown in PowerShell
 into Potter's iPhone settings. Windows may ask whether Python can communicate
 through the firewall; allow it for private networks only.
+
+For the no-API-cost local option, install Ollama for Windows, run
+`ollama pull gemma3:4b`, start the Potter server without a provider key, and
+select **Potter Local** in the app. Gemini 3.1 Pro can also use Google's limited
+free API tier with your own `GEMINI_API_KEY`.
