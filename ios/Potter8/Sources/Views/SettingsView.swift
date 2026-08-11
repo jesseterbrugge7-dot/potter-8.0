@@ -11,7 +11,7 @@ struct SettingsView: View {
         @Bindable var settings = settings
 
         Form {
-            Section("Potter server") {
+            Section {
                 TextField("Server URL", text: $settings.serverURLText)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
@@ -40,6 +40,8 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(connectionFailed ? Color.red : Color.green)
                 }
+            } header: {
+                Text("Potter server")
             } footer: {
                 Text("Simulator: http://127.0.0.1:8787. iPhone: use the .local address and token printed by the Python server.")
             }
